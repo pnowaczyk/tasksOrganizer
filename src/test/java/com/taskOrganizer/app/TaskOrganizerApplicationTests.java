@@ -1,4 +1,4 @@
-package com.taskOrganizer;
+package com.taskOrganizer.app;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
