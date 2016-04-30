@@ -1,5 +1,6 @@
 package com.taskOrganizer.app;
 
+import com.taskOrganizer.TaskOrganizerApplication;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.boot.test.SpringApplicationConfiguration;
