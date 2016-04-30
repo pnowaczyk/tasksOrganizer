@@ -34,6 +34,8 @@ dependencies {
 	compile('javax.ws.rs:javax.ws.rs-api:2.0.1')
 	testCompile('org.springframework.boot:spring-boot-starter-test')
 	testCompile('org.assertj:assertj-core:3.3.0')
+	compile("com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider:2.7.3")
+
 }
 
 

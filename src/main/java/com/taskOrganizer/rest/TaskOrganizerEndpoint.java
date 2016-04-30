@@ -1,9 +1,6 @@
 package com.taskOrganizer.rest;
 
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
+import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 
 /**
@@ -13,8 +10,8 @@ import javax.ws.rs.core.MediaType;
 public interface TaskOrganizerEndpoint {
 
     @POST
-    @Path("/newTask")
-    String createTask() throws Exception;
+    @Path("/newTask/{name}")
+    String createTask(@PathParam("name") String name) throws Exception;
 
     @GET
     @Path("/tasks")

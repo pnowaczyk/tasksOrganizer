@@ -1,11 +1,17 @@
 package com.taskOrganizer.rest;
 
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskOrganizer.model.TaskListModel;
 import com.taskOrganizer.model.TaskModel;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.util.UUID;
+
+import static com.taskOrganizer.model.TaskListModel.taskList;
 
 /**
  * Created by Gosia on 2016-04-26.
@@ -20,13 +26,16 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
         this.tasksList = tasksList;
     }
 
-    public String createTask() throws Exception {
-        TaskModel task = new TaskModel("TaskName", UUID.randomUUID().toString());
-        TaskListModel.taskList.add(task);
-        return task.getName();
+    public String createTask(String name) throws Exception {
+        TaskModel task = new TaskModel(name, UUID.randomUUID().toString());
+        taskList.add(task);
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.writeValueAsString(task);
     }
 
     public String getTasks() throws Exception {
-        return TaskListModel.taskList.toString();
+        ObjectMapper mapper = new ObjectMapper();
+
+        return mapper.writeValueAsString(taskList);
     }
 }
