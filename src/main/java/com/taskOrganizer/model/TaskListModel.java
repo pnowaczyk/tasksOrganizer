@@ -12,7 +12,8 @@ import java.util.List;
 @Configuration
 public class TaskListModel {
     public static List<TaskModel> taskList;
-    static{
+
+    static {
         taskList = new ArrayList<>();
     }
 
@@ -22,9 +23,20 @@ public class TaskListModel {
         return taskList;
     }
 
-    public void emptyTaskList(){
+    public void emptyTaskList() {
+
         taskList.clear();
     }
 
+    public TaskModel getTaskById(String id) {
+        TaskModel foundTask = null;
+        for (TaskModel task : taskList) {
+            if (task.getId().equals(id)) {
+                foundTask = task;
+                break;
+            }
+        }
+        return foundTask;
+    }
 
 }

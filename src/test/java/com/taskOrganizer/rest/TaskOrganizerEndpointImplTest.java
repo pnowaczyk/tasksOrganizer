@@ -7,12 +7,13 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.lang.reflect.Array;
-import java.util.ArrayList;
+import javax.ws.rs.WebApplicationException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Created by Gosia on 2016-04-30.
@@ -59,13 +60,42 @@ public class TaskOrganizerEndpointImplTest {
     }
 
     @Test
-    public void taskEndpointIntegrationTest() throws Exception{
+    public void markTaskDone() throws Exception {
+        String createdTaskJSON = taskEndpoint.createTask("Tech Leaders meeting");
+        ObjectMapper mapper = new ObjectMapper();
+        TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
+        assertThat(createdTask.getDone()).isEqualTo(false);
+        String markedDoneTaskJSON = taskEndpoint.markTaskDone(createdTask.getId());
+        TaskModel markedDoneTask = mapper.readValue(markedDoneTaskJSON, TaskModel.class);
+        assertThat(createdTask).isEqualTo(markedDoneTask);
+        assertThat(markedDoneTask.getDone()).isEqualTo(true);
+    }
+
+    public void taskToMarkDoneDoesNotExist() {
+        assertThat(taskListModel.getTaskList()).isEmpty();
+        UUID uuid = UUID.randomUUID();
+        assertThatThrownBy(() -> { taskEndpoint.markTaskDone(uuid.toString());
+        }).isInstanceOf(WebApplicationException.class);
+    }
+
+    @Test
+    public void taskEndpointIntegrationTest() throws Exception {
+        //testing endpoint creating task
         assertThat(taskListModel.getTaskList()).isEmpty();
         String createdTaskJSON = taskEndpoint.createTask("Tech Leaders meeting");
         assertThat(taskListModel.getTaskList().size()).isEqualTo(1);
         ObjectMapper mapper = new ObjectMapper();
         TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
         assertThat(taskListModel.getTaskList().get(0)).isEqualTo(createdTask);
+
+        //testing endpoint marking task done
+        assertThat(createdTask.getDone()).isEqualTo(false);
+        String markedDoneTaskJSON = taskEndpoint.markTaskDone(createdTask.getId());
+        TaskModel markedDoneTask = mapper.readValue(markedDoneTaskJSON, TaskModel.class);
+        assertThat(createdTask).isEqualTo(markedDoneTask);
+        assertThat(markedDoneTask.getDone()).isEqualTo(true);
+
+        //testing endpoint getting task list
         taskEndpoint.createTask("Going shopping");
         taskEndpoint.createTask("JOGA class");
         String retrievedTasksJSON = taskEndpoint.getTasks();

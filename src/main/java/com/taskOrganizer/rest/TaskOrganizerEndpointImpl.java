@@ -40,13 +40,7 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
 
     @Override
     public String markTaskDone(String taskId) throws Exception {
-        TaskModel foundTask = null;
-        for (TaskModel task : taskList) {
-            if (task.getId().equals(taskId)) {
-                foundTask = task;
-                break;
-            }
-        }
+        TaskModel foundTask = tasksListModel.getTaskById(taskId);
         if (foundTask != null) {
             foundTask.setDone(true);
             ObjectMapper mapper = new ObjectMapper();
