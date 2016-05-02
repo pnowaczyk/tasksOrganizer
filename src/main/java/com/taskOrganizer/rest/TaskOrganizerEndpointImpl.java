@@ -4,13 +4,11 @@ package com.taskOrganizer.rest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskOrganizer.model.TaskListModel;
 import com.taskOrganizer.model.TaskModel;
+import com.taskOrganizer.model.TaskPostJSONModel;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import javax.ws.rs.PathParam;
 import javax.ws.rs.WebApplicationException;
 import java.util.UUID;
 
-import static com.taskOrganizer.model.TaskListModel.taskList;
 
 /**
  * Created by Gosia on 2016-04-26.
@@ -19,23 +17,24 @@ import static com.taskOrganizer.model.TaskListModel.taskList;
 public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
 
     private TaskListModel tasksListModel;
+    private ObjectMapper mapper;
 
     @Autowired
-    public TaskOrganizerEndpointImpl(TaskListModel tasksListModel) {
+    public TaskOrganizerEndpointImpl(TaskListModel tasksListModel, ObjectMapper mapper) {
+
         this.tasksListModel = tasksListModel;
+        this.mapper = mapper;
     }
 
-    public String createTask(String name) throws Exception {
-        TaskModel task = new TaskModel(name, UUID.randomUUID().toString());
-        taskList.add(task);
-        ObjectMapper mapper = new ObjectMapper();
+    public String createTask(String inputData) throws Exception {
+        TaskPostJSONModel inputDataObj = mapper.readValue(inputData, TaskPostJSONModel.class);
+        TaskModel task = new TaskModel(inputDataObj.name, UUID.randomUUID().toString());
+        tasksListModel.getTaskList().add(task);
         return mapper.writeValueAsString(task);
     }
 
     public String getTasks() throws Exception {
-        ObjectMapper mapper = new ObjectMapper();
-
-        return mapper.writeValueAsString(taskList);
+        return mapper.writeValueAsString( tasksListModel.getTaskList());
     }
 
     @Override
@@ -43,7 +42,6 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
         TaskModel foundTask = tasksListModel.getTaskById(taskId);
         if (foundTask != null) {
             foundTask.setDone(true);
-            ObjectMapper mapper = new ObjectMapper();
             return mapper.writeValueAsString(foundTask);
         } else {
             throw new WebApplicationException(404);

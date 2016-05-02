@@ -3,6 +3,7 @@ package com.taskOrganizer.rest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskOrganizer.model.TaskListModel;
 import com.taskOrganizer.model.TaskModel;
+import com.taskOrganizer.model.TaskPostJSONModel;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -22,24 +23,29 @@ public class TaskOrganizerEndpointImplTest {
 
     private TaskOrganizerEndpointImpl taskEndpoint;
     private TaskListModel taskListModel;
+    private ObjectMapper mapper;
+    private TaskPostJSONModel taskInputData;
+    private String[] taskNames = {"Tech Leaders meeting", "Going shopping", "JOGA class"};
 
     @Before
     public void setUp() {
         taskListModel = new TaskListModel();
-        taskEndpoint = new TaskOrganizerEndpointImpl(taskListModel);
+        mapper = new ObjectMapper();
+        taskEndpoint = new TaskOrganizerEndpointImpl(taskListModel, mapper);
+        taskInputData = new TaskPostJSONModel();
     }
 
     @After
     public void tearDown() {
+
         taskListModel.emptyTaskList();
     }
 
     @Test
     public void createNewTask() throws Exception {
-        assertThat(taskListModel.getTaskList()).isEmpty();
-        String createdTaskJSON = taskEndpoint.createTask("Tech Leaders meeting");
+        taskInputData.name = taskNames[0];
+        String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
         assertThat(taskListModel.getTaskList().size()).isEqualTo(1);
-        ObjectMapper mapper = new ObjectMapper();
         TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
         assertThat(taskListModel.getTaskList().get(0)).isEqualTo(createdTask);
 
@@ -47,12 +53,12 @@ public class TaskOrganizerEndpointImplTest {
 
     @Test
     public void getAllTasks() throws Exception {
-        assertThat(taskListModel.getTaskList()).isEmpty();
-        taskEndpoint.createTask("Tech Leaders meeting");
-        taskEndpoint.createTask("Going shopping");
-        taskEndpoint.createTask("JOGA class");
+
+        for (int i = 0; i < taskNames.length; i++) {
+            taskInputData.name = taskNames[i];
+            taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
+        }
         String retrievedTasksJSON = taskEndpoint.getTasks();
-        ObjectMapper mapper = new ObjectMapper();
         TaskModel[] retrievedTasks = mapper.readValue(retrievedTasksJSON, TaskModel[].class);
         List<TaskModel> retrievedTasksList = Arrays.asList(retrievedTasks);
         assertThat(retrievedTasksList.size()).isEqualTo(3);
@@ -61,8 +67,8 @@ public class TaskOrganizerEndpointImplTest {
 
     @Test
     public void markTaskDone() throws Exception {
-        String createdTaskJSON = taskEndpoint.createTask("Tech Leaders meeting");
-        ObjectMapper mapper = new ObjectMapper();
+        taskInputData.name = taskNames[0];
+        String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
         TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
         assertThat(createdTask.getDone()).isEqualTo(false);
         String markedDoneTaskJSON = taskEndpoint.markTaskDone(createdTask.getId());
@@ -72,19 +78,18 @@ public class TaskOrganizerEndpointImplTest {
     }
 
     public void taskToMarkDoneDoesNotExist() {
-        assertThat(taskListModel.getTaskList()).isEmpty();
         UUID uuid = UUID.randomUUID();
-        assertThatThrownBy(() -> { taskEndpoint.markTaskDone(uuid.toString());
+        assertThatThrownBy(() -> {
+            taskEndpoint.markTaskDone(uuid.toString());
         }).isInstanceOf(WebApplicationException.class);
     }
 
     @Test
     public void taskEndpointIntegrationTest() throws Exception {
         //testing endpoint creating task
-        assertThat(taskListModel.getTaskList()).isEmpty();
-        String createdTaskJSON = taskEndpoint.createTask("Tech Leaders meeting");
+        taskInputData.name = taskNames[0];
+        String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
         assertThat(taskListModel.getTaskList().size()).isEqualTo(1);
-        ObjectMapper mapper = new ObjectMapper();
         TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
         assertThat(taskListModel.getTaskList().get(0)).isEqualTo(createdTask);
 
@@ -96,8 +101,10 @@ public class TaskOrganizerEndpointImplTest {
         assertThat(markedDoneTask.getDone()).isEqualTo(true);
 
         //testing endpoint getting task list
-        taskEndpoint.createTask("Going shopping");
-        taskEndpoint.createTask("JOGA class");
+        taskInputData.name = taskNames[1];
+        taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
+        taskInputData.name = taskNames[2];
+        taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
         String retrievedTasksJSON = taskEndpoint.getTasks();
         TaskModel[] retrievedTasks = mapper.readValue(retrievedTasksJSON, TaskModel[].class);
         List<TaskModel> retrievedTasksList = Arrays.asList(retrievedTasks);

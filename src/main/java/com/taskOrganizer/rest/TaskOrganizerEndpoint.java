@@ -10,8 +10,9 @@ import javax.ws.rs.core.MediaType;
 public interface TaskOrganizerEndpoint {
 
     @POST
-    @Path("/newTask/{name}")
-    String createTask(@PathParam("name") String name) throws Exception;
+    @Consumes({"application/json"})
+    @Path("/newTask")
+    String createTask(String inputData) throws Exception;
 
     @GET
     @Path("/tasks")
