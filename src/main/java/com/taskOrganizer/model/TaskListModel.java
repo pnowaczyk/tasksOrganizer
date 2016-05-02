@@ -22,6 +22,9 @@ public class TaskListModel {
         return taskList;
     }
 
+    public void emptyTaskList(){
+        taskList.clear();
+    }
 
 
 }

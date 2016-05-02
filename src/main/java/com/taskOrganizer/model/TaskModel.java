@@ -12,12 +12,42 @@ public class TaskModel {
         this.id = id;
     }
 
+    public TaskModel() {
+    }
+
     public String getName() {
         return name;
     }
 
     public String getId() {
         return id;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        TaskModel taskModel = (TaskModel) o;
+        if (name == null) {
+            if (taskModel.name != null)
+                return false;
+        } else if (!name.equals(taskModel.name))
+            return false;
+        if (id == null) {
+            if (taskModel.id != null)
+                return false;
+        } else if (!id.equals(taskModel.id))
+            return false;
+        return true;
+
+    }
+
+    @Override
+    public int hashCode() {
+        int result = name != null ? name.hashCode() : 0;
+        result = 31 * result + (id != null ? id.hashCode() : 0);
+        return result;
     }
 
     public void setName(String name) {
