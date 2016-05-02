@@ -18,4 +18,8 @@ public interface TaskOrganizerEndpoint {
     @Produces(MediaType.APPLICATION_JSON)
     String getTasks() throws Exception;
 
+    @POST
+    @Path("/done/{taskId}")
+    String markTaskDone(@PathParam("taskId") String taskId) throws Exception;
+
 }
