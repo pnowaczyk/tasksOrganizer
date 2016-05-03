@@ -5,6 +5,3 @@ jdk:
 
 before_install:
  - chmod +x gradlew
-
- services:
- - mongodb
