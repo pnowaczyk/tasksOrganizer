@@ -1,6 +1,7 @@
 package com.taskOrganizer.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.taskOrganizer.conf.MongoTestConfig;
 import com.taskOrganizer.model.TaskModel;
 import com.taskOrganizer.model.TaskPostJSONModel;
@@ -14,6 +15,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import javax.ws.rs.WebApplicationException;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -34,10 +36,12 @@ public class TaskOrganizerEndpointImplTest {
     @Autowired
     private TaskRepository repository;
     private String[] taskNames = {"Tech Leaders meeting", "Going shopping", "JOGA class"};
+    private String[] taskDescriptions= {"Tech Leaders meeting description", "Buying milk, eggs, tomatoes", "JOGA class with Magda"};
 
     @Before
     public void setUp() {
         mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
         taskEndpoint = new TaskOrganizerEndpointImpl(mapper, repository);
         taskInputData = new TaskPostJSONModel();
         repository.deleteAll();
@@ -52,6 +56,8 @@ public class TaskOrganizerEndpointImplTest {
     @Test
     public void createNewTask() throws Exception {
         taskInputData.name = taskNames[0];
+        taskInputData.description = taskDescriptions[0];
+        taskInputData.dueDate = LocalDateTime.now().plusDays(7);
         String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
         assertThat(repository.findAll().size()).isEqualTo(1);
         TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
@@ -64,6 +70,8 @@ public class TaskOrganizerEndpointImplTest {
 
         for (int i = 0; i < taskNames.length; i++) {
             taskInputData.name = taskNames[i];
+            taskInputData.description = taskDescriptions[i];
+            taskInputData.dueDate = LocalDateTime.now().plusDays(7 + i);
             taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
         }
         String retrievedTasksJSON = taskEndpoint.getTasks();
@@ -76,6 +84,8 @@ public class TaskOrganizerEndpointImplTest {
     @Test
     public void markTaskDone() throws Exception {
         taskInputData.name = taskNames[0];
+        taskInputData.description = taskDescriptions[0];
+        taskInputData.dueDate = LocalDateTime.now().plusDays(7);
         String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
         TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
         assertThat(createdTask.getDone()).isEqualTo(false);
@@ -96,6 +106,8 @@ public class TaskOrganizerEndpointImplTest {
     public void taskEndpointIntegrationTest() throws Exception {
         //testing endpoint creating task
         taskInputData.name = taskNames[0];
+        taskInputData.description = taskDescriptions[0];
+        taskInputData.dueDate = LocalDateTime.now().plusDays(7);
         String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
         assertThat(repository.findAll().size()).isEqualTo(1);
         TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
@@ -110,8 +122,12 @@ public class TaskOrganizerEndpointImplTest {
 
         //testing endpoint getting task list
         taskInputData.name = taskNames[1];
+        taskInputData.description = taskDescriptions[1];
+        taskInputData.dueDate = LocalDateTime.now().plusDays(7);
         taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
         taskInputData.name = taskNames[2];
+        taskInputData.description = taskDescriptions[2];
+        taskInputData.dueDate = LocalDateTime.now().plusDays(7);
         taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
         String retrievedTasksJSON = taskEndpoint.getTasks();
         TaskModel[] retrievedTasks = mapper.readValue(retrievedTasksJSON, TaskModel[].class);

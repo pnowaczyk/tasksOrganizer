@@ -2,12 +2,15 @@ package com.taskOrganizer.rest;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.taskOrganizer.model.TaskModel;
 import com.taskOrganizer.model.TaskPostJSONModel;
 import com.taskOrganizer.model.TaskRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.ws.rs.WebApplicationException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.UUID;
 
 
@@ -19,17 +22,19 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
 
     private ObjectMapper mapper;
     private TaskRepository repository;
+    private DateFormat df = new SimpleDateFormat("yyyy-MM-dd");
 
     @Autowired
     public TaskOrganizerEndpointImpl(ObjectMapper mapper, TaskRepository repository) {
 
         this.mapper = mapper;
+        mapper.registerModule(new JavaTimeModule());
         this.repository = repository;
     }
 
     public String createTask(String inputData) throws Exception {
         TaskPostJSONModel inputDataObj = mapper.readValue(inputData, TaskPostJSONModel.class);
-        TaskModel task = new TaskModel(inputDataObj.name, UUID.randomUUID().toString());
+        TaskModel task = new TaskModel(inputDataObj.name, inputDataObj.description, UUID.randomUUID().toString(), inputDataObj.dueDate);
         repository.save(task);
         return mapper.writeValueAsString(task);
     }
