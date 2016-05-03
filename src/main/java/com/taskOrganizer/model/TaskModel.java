@@ -1,10 +1,15 @@
 package com.taskOrganizer.model;
 
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
 /**
  * Created by Gosia on 2016-04-26.
  */
+@Document(collection = "tasks")
 public class TaskModel {
     private String name;
+    @Id
     private String id;
     private Boolean isDone;
 
