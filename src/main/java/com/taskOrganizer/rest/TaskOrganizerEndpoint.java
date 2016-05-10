@@ -19,8 +19,19 @@ public interface TaskOrganizerEndpoint {
     @Produces(MediaType.APPLICATION_JSON)
     String getTasks() throws Exception;
 
+    @GET
+    @Path("/search")
+    @Produces(MediaType.APPLICATION_JSON)
+    String findTasks(
+            @QueryParam("query") String query
+    ) throws Exception;
+
     @POST
     @Path("/done/{taskId}")
     String markTaskDone(@PathParam("taskId") String taskId) throws Exception;
 
+    @GET
+    @Path("/tasks/notDone")
+    @Produces(MediaType.APPLICATION_JSON)
+    String getNotDoneTasks() throws Exception;
 }

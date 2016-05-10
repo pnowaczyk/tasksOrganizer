@@ -2,10 +2,16 @@ package com.taskOrganizer.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.google.common.io.Files;
 import com.taskOrganizer.conf.MongoTestConfig;
 import com.taskOrganizer.model.TaskModel;
 import com.taskOrganizer.model.TaskPostJSONModel;
 import com.taskOrganizer.model.TaskRepository;
+import org.elasticsearch.action.admin.indices.refresh.RefreshRequest;
+import org.elasticsearch.client.Requests;
+import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.node.Node;
+import org.elasticsearch.client.Client;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -15,6 +21,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import javax.ws.rs.WebApplicationException;
+import java.io.File;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -22,6 +29,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.elasticsearch.node.NodeBuilder.nodeBuilder;
 
 /**
  * Created by Gosia on 2016-04-30.
@@ -37,12 +45,26 @@ public class TaskOrganizerEndpointImplTest {
     private TaskRepository repository;
     private String[] taskNames = {"Tech Leaders meeting", "Going shopping", "JOGA class"};
     private String[] taskDescriptions= {"Tech Leaders meeting description", "Buying milk, eggs, tomatoes", "JOGA class with Magda"};
+    private Client elasticClient;
+    private File tmpDir;
+    private Node node;
 
     @Before
     public void setUp() {
         mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
-        taskEndpoint = new TaskOrganizerEndpointImpl(mapper, repository);
+        tmpDir = Files.createTempDir();
+        node = nodeBuilder()
+                .local(true)
+                .settings(
+                        Settings.builder().put("path.home",
+                                tmpDir.getAbsolutePath()))
+                .clusterName("integrationCluster").node();
+        elasticClient = node.client();
+        // documents for tests
+        elasticClient.admin().indices().create(Requests.createIndexRequest("taskorganizer")).actionGet();
+        elasticClient.admin().indices().refresh(new RefreshRequest()).actionGet();
+        taskEndpoint = new TaskOrganizerEndpointImpl(mapper, repository, elasticClient);
         taskInputData = new TaskPostJSONModel();
         repository.deleteAll();
     }
@@ -50,7 +72,13 @@ public class TaskOrganizerEndpointImplTest {
     @After
     public void tearDown() {
 
-        //taskListModel.emptyTaskList();
+        elasticClient.admin()
+                .indices()
+                .delete(Requests
+                        .deleteIndexRequest("tasksorganizer"))
+                .actionGet();
+        node.close();
+        tmpDir.delete();
     }
 
     @Test

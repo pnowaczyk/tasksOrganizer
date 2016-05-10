@@ -37,7 +37,7 @@ dependencies {
 	compile("com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider:2.7.3")
 	compile("org.springframework.boot:spring-boot-starter-data-mongodb")
 	compile("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.7.4")
-
+	compile('org.elasticsearch:elasticsearch:2.2.1')
 
 
 }

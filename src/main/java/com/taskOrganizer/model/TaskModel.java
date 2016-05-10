@@ -16,6 +16,7 @@ public class TaskModel {
     private String id;
     private String description;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm")
+    //można na Instant i timestamp
     private LocalDateTime dueDate;
     private Boolean isDone;
 

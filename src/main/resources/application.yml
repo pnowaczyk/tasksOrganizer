@@ -1,0 +1,11 @@
+elastic:
+  cluster:
+    name: elasticsearch
+    nodes:
+      - localhost
+    port: 9300
+
+  db:
+    databaseName: Prod_database.db
+    driverName: org.sqlite.JDBC
+    databasePrefix: "jdbc:sqlite:"
