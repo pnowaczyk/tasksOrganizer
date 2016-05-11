@@ -56,7 +56,16 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
     }
 
     public String getTasks() throws Exception {
-        return mapper.writeValueAsString(repository.findAll());
+        SearchResponse res = elasticClient.prepareSearch("tasksorganizer")
+                .setTypes("task")
+                .setQuery(QueryBuilders.matchAllQuery()).execute()
+                .actionGet();
+        List<TaskModel> allTasks = new ArrayList<>();
+        Iterator<SearchHit> iterator = res.getHits().iterator();
+        while (iterator.hasNext()) {
+            allTasks.add(mapper.readValue(iterator.next().getSourceAsString(), TaskModel.class));
+        }
+        return mapper.writeValueAsString(allTasks);
     }
 
 
@@ -87,8 +96,9 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
     public String markTaskDone(String taskId) throws Exception {
         GetResponse getResponse = elasticClient
         .prepareGet("tasksorganizer", "task", taskId).get();
+        TaskModel foundTask = repository.findById(taskId);
 
-        if (getResponse.isExists()) {
+        if (getResponse.isExists() && (foundTask != null)) {
             UpdateRequest updateRequest = new UpdateRequest();
             updateRequest.index("tasksorganizer");
             updateRequest.type("task");
@@ -98,17 +108,11 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
                     .field("done", true)
                     .endObject());
             elasticClient.update(updateRequest).get();
-
-
-
-        } else {
-            throw new NotFoundException();
-        }
-        TaskModel foundTask = repository.findById(taskId);
-        if (foundTask != null) {
             foundTask.setDone(true);
             repository.save(foundTask);
             return mapper.writeValueAsString(foundTask);
+
+
         } else {
             throw new WebApplicationException(404);
         }

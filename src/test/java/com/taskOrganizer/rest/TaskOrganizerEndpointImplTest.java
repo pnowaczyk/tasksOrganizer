@@ -8,10 +8,11 @@ import com.taskOrganizer.model.TaskModel;
 import com.taskOrganizer.model.TaskPostJSONModel;
 import com.taskOrganizer.model.TaskRepository;
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest;
+import org.elasticsearch.action.get.GetResponse;
+import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Requests;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.node.Node;
-import org.elasticsearch.client.Client;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -23,6 +24,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import javax.ws.rs.WebApplicationException;
 import java.io.File;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -44,7 +46,7 @@ public class TaskOrganizerEndpointImplTest {
     @Autowired
     private TaskRepository repository;
     private String[] taskNames = {"Tech Leaders meeting", "Going shopping", "JOGA class"};
-    private String[] taskDescriptions= {"Tech Leaders meeting description", "Buying milk, eggs, tomatoes", "JOGA class with Magda"};
+    private String[] taskDescriptions= {"Tech Leaders meeting description", "Buying milk, eggs, tomatoes", "JOGA class, meeting with Magda"};
     private Client elasticClient;
     private File tmpDir;
     private Node node;
@@ -59,10 +61,10 @@ public class TaskOrganizerEndpointImplTest {
                 .settings(
                         Settings.builder().put("path.home",
                                 tmpDir.getAbsolutePath()))
-                .clusterName("integrationCluster").node();
+                .clusterName("taskOrganizerCluster").node();
         elasticClient = node.client();
         // documents for tests
-        elasticClient.admin().indices().create(Requests.createIndexRequest("taskorganizer")).actionGet();
+        elasticClient.admin().indices().create(Requests.createIndexRequest("tasksorganizer")).actionGet();
         elasticClient.admin().indices().refresh(new RefreshRequest()).actionGet();
         taskEndpoint = new TaskOrganizerEndpointImpl(mapper, repository, elasticClient);
         taskInputData = new TaskPostJSONModel();
@@ -90,6 +92,10 @@ public class TaskOrganizerEndpointImplTest {
         assertThat(repository.findAll().size()).isEqualTo(1);
         TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
         assertThat(repository.findById(createdTask.getId())).isEqualTo(createdTask);
+        GetResponse taskInElastic = elasticClient.prepareGet(
+                "tasksorganizer", "task",
+                createdTask.getId()).get();
+        assertThat(mapper.readValue(taskInElastic.getSourceAsString(), TaskModel.class)).isEqualTo(createdTask);
 
     }
 
@@ -110,6 +116,20 @@ public class TaskOrganizerEndpointImplTest {
     }
 
     @Test
+    public void findTasks() throws Exception{
+        for (int i = 0; i < taskNames.length; i++) {
+            taskInputData.name = taskNames[i];
+            taskInputData.description = taskDescriptions[i];
+            taskInputData.dueDate = LocalDateTime.now().plusDays(7 + i);
+            taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
+        }
+        String foundTasksJSON = taskEndpoint.findTasks("Leaders");
+        TaskModel[] foundTasks = mapper.readValue(foundTasksJSON, TaskModel[].class);
+        List<TaskModel> retrievedTasksList = Arrays.asList(foundTasks);
+        assertThat(retrievedTasksList.size()).isEqualTo(1);
+    }
+
+    @Test
     public void markTaskDone() throws Exception {
         taskInputData.name = taskNames[0];
         taskInputData.description = taskDescriptions[0];
@@ -121,13 +141,37 @@ public class TaskOrganizerEndpointImplTest {
         TaskModel markedDoneTask = mapper.readValue(markedDoneTaskJSON, TaskModel.class);
         assertThat(createdTask).isEqualTo(markedDoneTask);
         assertThat(markedDoneTask.getDone()).isEqualTo(true);
+        GetResponse taskInElastic = elasticClient.prepareGet(
+                "tasksorganizer", "task",
+                createdTask.getId()).get();
+        assertThat(mapper.readValue(taskInElastic.getSourceAsString(), TaskModel.class)).isEqualTo(createdTask);
+        assertThat(taskInElastic.getSource().get("done")).isEqualTo(true);
     }
 
+    @Test
     public void taskToMarkDoneDoesNotExist() {
         UUID uuid = UUID.randomUUID();
         assertThatThrownBy(() -> {
             taskEndpoint.markTaskDone(uuid.toString());
         }).isInstanceOf(WebApplicationException.class);
+    }
+
+    @Test
+    public void getNotDoneTasks() throws Exception{
+        List<String> uuids = new ArrayList<>();
+        for (int i = 0; i < taskNames.length; i++) {
+            taskInputData.name = taskNames[i];
+            taskInputData.description = taskDescriptions[i];
+            taskInputData.dueDate = LocalDateTime.now().plusDays(7 + i);
+            String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
+            TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
+            uuids.add(createdTask.getId());
+        }
+
+        String retrievedTasksJSON = taskEndpoint.getNotDoneTasks();
+        TaskModel[] retrievedTasks = mapper.readValue(retrievedTasksJSON, TaskModel[].class);
+        List<TaskModel> retrievedTasksList = Arrays.asList(retrievedTasks);
+        assertThat(retrievedTasksList.size()).isEqualTo(3);
     }
 
     @Test
