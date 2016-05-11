@@ -15,9 +15,10 @@ import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.sort.SortOrder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import javax.ws.rs.NotFoundException;
 import javax.ws.rs.WebApplicationException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -36,6 +37,7 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
     private TaskRepository repository;
     private DateFormat df = new SimpleDateFormat("yyyy-MM-dd");
     private Client elasticClient;
+    final static Logger logger = LoggerFactory.getLogger(TaskOrganizerEndpointImpl.class);
 
     @Autowired
     public TaskOrganizerEndpointImpl(ObjectMapper mapper, TaskRepository repository, Client elasticClient) {
@@ -47,6 +49,7 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
     }
 
     public String createTask(String inputData) throws Exception {
+        logger.info("Creating task");
         TaskPostJSONModel inputDataObj = mapper.readValue(inputData, TaskPostJSONModel.class);
         TaskModel task = new TaskModel(inputDataObj.name, inputDataObj.description, UUID.randomUUID().toString(), inputDataObj.dueDate);
         repository.save(task);
@@ -56,6 +59,7 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
     }
 
     public String getTasks() throws Exception {
+        logger.info("Getting tasks");
         SearchResponse res = elasticClient.prepareSearch("tasksorganizer")
                 .setTypes("task")
                 .setQuery(QueryBuilders.matchAllQuery()).execute()
@@ -71,6 +75,7 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
 
     @Override
     public String findTasks(String query) throws Exception {
+        logger.info("Searching tasks with query: " + query);
         //SimpleQueryStringBuilder sb = QueryBuilders.simpleQueryStringQuery(query);
         QueryBuilder qb = QueryBuilders.wildcardQuery("name", query);
         SearchResponse res = elasticClient.prepareSearch("tasksorganizer").setTypes("task").setQuery(qb).execute().actionGet();
@@ -94,6 +99,7 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
     //@Retryable -> do ponawiania transakcji i w aplikacji trzeba dodać enableRetryable
     @Override
     public String markTaskDone(String taskId) throws Exception {
+        logger.info("Marking task done with taskId: " + taskId);
         GetResponse getResponse = elasticClient
         .prepareGet("tasksorganizer", "task", taskId).get();
         TaskModel foundTask = repository.findById(taskId);
@@ -121,6 +127,7 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
 
     @Override
     public String getNotDoneTasks() throws Exception {
+        logger.info("Getting not done tasks ");
         List<TaskModel> foundTasks = new ArrayList<>();
         QueryBuilder qb = QueryBuilders.matchQuery("done", false);
 

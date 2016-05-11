@@ -1,0 +1,2 @@
+2016-05-11 21:36:10,922 INFO [XNIO-2 task-1] c.t.r.TaskOrganizerEndpointImpl [TaskOrganizerEndpointImpl.java:62] Getting tasks
+2016-05-11 21:36:59,458 INFO [XNIO-2 task-2] c.t.r.TaskOrganizerEndpointImpl [TaskOrganizerEndpointImpl.java:62] Getting tasks
