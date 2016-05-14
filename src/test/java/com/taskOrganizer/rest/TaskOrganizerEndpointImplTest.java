@@ -1,6 +1,7 @@
 package com.taskOrganizer.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.io.Files;
 import com.taskOrganizer.conf.MongoTestConfig;
@@ -13,6 +14,7 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Requests;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.node.Node;
+import java.time.Instant;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -23,7 +25,6 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import javax.ws.rs.WebApplicationException;
 import java.io.File;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -45,16 +46,18 @@ public class TaskOrganizerEndpointImplTest {
     private TaskPostJSONModel taskInputData;
     @Autowired
     private TaskRepository repository;
-    private String[] taskNames = {"Tech Leaders meeting", "Going shopping", "JOGA class"};
-    private String[] taskDescriptions= {"Tech Leaders meeting description", "Buying milk, eggs, tomatoes", "JOGA class, meeting with Magda"};
+    private String[] taskNames = {"ATech Leaders meeting", "BGoing shopping", "CJOGA class"};
+    private String[] taskDescriptions = {"Tech Leaders meeting description", "Buying milk, eggs, tomatoes", "JOGA class, meeting with Magda"};
     private Client elasticClient;
     private File tmpDir;
     private Node node;
+    private List<TaskModel> intialTaskList;
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
         mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
+        mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, true);
         tmpDir = Files.createTempDir();
         node = nodeBuilder()
                 .local(true)
@@ -69,6 +72,18 @@ public class TaskOrganizerEndpointImplTest {
         taskEndpoint = new TaskOrganizerEndpointImpl(mapper, repository, elasticClient);
         taskInputData = new TaskPostJSONModel();
         repository.deleteAll();
+        intialTaskList = new ArrayList<>();
+        for (int i = 0; i < taskNames.length; i++) {
+            taskInputData.name = taskNames[i];
+            taskInputData.description = taskDescriptions[i];
+            taskInputData.dueDate = Instant.now().plusMillis(1000*60*60*24);
+            taskInputData.userName = "janTest";
+            String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
+            TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
+            intialTaskList.add(createdTask);
+        }
+
+        elasticClient.admin().indices().refresh(new RefreshRequest()).actionGet();
     }
 
     @After
@@ -85,11 +100,12 @@ public class TaskOrganizerEndpointImplTest {
 
     @Test
     public void createNewTask() throws Exception {
-        taskInputData.name = taskNames[0];
-        taskInputData.description = taskDescriptions[0];
-        taskInputData.dueDate = LocalDateTime.now().plusDays(7);
+        taskInputData.name = "New task";
+        taskInputData.description = "Brand new test task";
+        taskInputData.dueDate = Instant.now().plusMillis(1000*60*60*24);
+        taskInputData.userName = "gosiaTest";
         String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
-        assertThat(repository.findAll().size()).isEqualTo(1);
+        assertThat(repository.findAll().size()).isEqualTo(4);
         TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
         assertThat(repository.findById(createdTask.getId())).isEqualTo(createdTask);
         GetResponse taskInElastic = elasticClient.prepareGet(
@@ -102,28 +118,17 @@ public class TaskOrganizerEndpointImplTest {
     @Test
     public void getAllTasks() throws Exception {
 
-        for (int i = 0; i < taskNames.length; i++) {
-            taskInputData.name = taskNames[i];
-            taskInputData.description = taskDescriptions[i];
-            taskInputData.dueDate = LocalDateTime.now().plusDays(7 + i);
-            taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
-        }
-        String retrievedTasksJSON = taskEndpoint.getTasks();
+
+        String retrievedTasksJSON = taskEndpoint.getTasks("janTest");
         TaskModel[] retrievedTasks = mapper.readValue(retrievedTasksJSON, TaskModel[].class);
         List<TaskModel> retrievedTasksList = Arrays.asList(retrievedTasks);
-        assertThat(retrievedTasksList.size()).isEqualTo(3);
-        assertThat(retrievedTasksList).isEqualTo(repository.findAll());
+        assertThat(retrievedTasksList.size()).isEqualTo(intialTaskList.size());
+        assertThat(retrievedTasksList).isEqualTo(intialTaskList);
     }
 
     @Test
-    public void findTasks() throws Exception{
-        for (int i = 0; i < taskNames.length; i++) {
-            taskInputData.name = taskNames[i];
-            taskInputData.description = taskDescriptions[i];
-            taskInputData.dueDate = LocalDateTime.now().plusDays(7 + i);
-            taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
-        }
-        String foundTasksJSON = taskEndpoint.findTasks("Leaders");
+    public void findTasks() throws Exception {
+        String foundTasksJSON = taskEndpoint.findTasks("Leaders", "janTest");
         TaskModel[] foundTasks = mapper.readValue(foundTasksJSON, TaskModel[].class);
         List<TaskModel> retrievedTasksList = Arrays.asList(foundTasks);
         assertThat(retrievedTasksList.size()).isEqualTo(1);
@@ -131,44 +136,23 @@ public class TaskOrganizerEndpointImplTest {
 
     @Test
     public void markTaskDone() throws Exception {
-        taskInputData.name = taskNames[0];
-        taskInputData.description = taskDescriptions[0];
-        taskInputData.dueDate = LocalDateTime.now().plusDays(7);
-        String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
-        TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
-        assertThat(createdTask.getDone()).isEqualTo(false);
-        String markedDoneTaskJSON = taskEndpoint.markTaskDone(createdTask.getId());
+        String markedDoneTaskJSON = taskEndpoint.markTaskDone(intialTaskList.get(0).getId(), "janTest");
+        intialTaskList.get(0).setDone(true);
         TaskModel markedDoneTask = mapper.readValue(markedDoneTaskJSON, TaskModel.class);
-        assertThat(createdTask).isEqualTo(markedDoneTask);
-        assertThat(markedDoneTask.getDone()).isEqualTo(true);
-        GetResponse taskInElastic = elasticClient.prepareGet(
-                "tasksorganizer", "task",
-                createdTask.getId()).get();
-        assertThat(mapper.readValue(taskInElastic.getSourceAsString(), TaskModel.class)).isEqualTo(createdTask);
-        assertThat(taskInElastic.getSource().get("done")).isEqualTo(true);
+        assertThat(intialTaskList.get(0)).isEqualTo(markedDoneTask);
     }
 
     @Test
     public void taskToMarkDoneDoesNotExist() {
         UUID uuid = UUID.randomUUID();
         assertThatThrownBy(() -> {
-            taskEndpoint.markTaskDone(uuid.toString());
+            taskEndpoint.markTaskDone(uuid.toString(), "janTest");
         }).isInstanceOf(WebApplicationException.class);
     }
 
     @Test
-    public void getNotDoneTasks() throws Exception{
-        List<String> uuids = new ArrayList<>();
-        for (int i = 0; i < taskNames.length; i++) {
-            taskInputData.name = taskNames[i];
-            taskInputData.description = taskDescriptions[i];
-            taskInputData.dueDate = LocalDateTime.now().plusDays(7 + i);
-            String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
-            TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
-            uuids.add(createdTask.getId());
-        }
-
-        String retrievedTasksJSON = taskEndpoint.getNotDoneTasks();
+    public void getNotDoneTasks() throws Exception {
+        String retrievedTasksJSON = taskEndpoint.getNotDoneTasks("janTest");
         TaskModel[] retrievedTasks = mapper.readValue(retrievedTasksJSON, TaskModel[].class);
         List<TaskModel> retrievedTasksList = Arrays.asList(retrievedTasks);
         assertThat(retrievedTasksList.size()).isEqualTo(3);
@@ -177,34 +161,31 @@ public class TaskOrganizerEndpointImplTest {
     @Test
     public void taskEndpointIntegrationTest() throws Exception {
         //testing endpoint creating task
-        taskInputData.name = taskNames[0];
-        taskInputData.description = taskDescriptions[0];
-        taskInputData.dueDate = LocalDateTime.now().plusDays(7);
+        taskInputData.name = "New task";
+        taskInputData.description = "Brand new test task";
+        taskInputData.dueDate = Instant.now();
+        taskInputData.userName = "gosiaTest";
         String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
-        assertThat(repository.findAll().size()).isEqualTo(1);
+        elasticClient.admin().indices().refresh(new RefreshRequest()).actionGet();
+        assertThat(repository.findAll().size()).isEqualTo(4);
         TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
-        assertThat(repository.findById(createdTask.getId())).isEqualTo(createdTask);
-
-        //testing endpoint marking task done
-        assertThat(createdTask.getDone()).isEqualTo(false);
-        String markedDoneTaskJSON = taskEndpoint.markTaskDone(createdTask.getId());
-        TaskModel markedDoneTask = mapper.readValue(markedDoneTaskJSON, TaskModel.class);
-        assertThat(createdTask).isEqualTo(markedDoneTask);
-        assertThat(markedDoneTask.getDone()).isEqualTo(true);
+        TaskModel newTask = new TaskModel(taskInputData.name, taskInputData.description, createdTask.getId(), taskInputData.dueDate, taskInputData.userName);
+        assertThat(newTask).isEqualTo(createdTask);
 
         //testing endpoint getting task list
-        taskInputData.name = taskNames[1];
-        taskInputData.description = taskDescriptions[1];
-        taskInputData.dueDate = LocalDateTime.now().plusDays(7);
-        taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
-        taskInputData.name = taskNames[2];
-        taskInputData.description = taskDescriptions[2];
-        taskInputData.dueDate = LocalDateTime.now().plusDays(7);
-        taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
-        String retrievedTasksJSON = taskEndpoint.getTasks();
+        String retrievedTasksJSON = taskEndpoint.getTasks("janTest");
         TaskModel[] retrievedTasks = mapper.readValue(retrievedTasksJSON, TaskModel[].class);
         List<TaskModel> retrievedTasksList = Arrays.asList(retrievedTasks);
         assertThat(retrievedTasksList.size()).isEqualTo(3);
-        assertThat(retrievedTasksList).isEqualTo(repository.findAll());
+        assertThat(retrievedTasksList).isEqualTo(intialTaskList);
+
+        //testing endpoint marking task done
+        assertThat(createdTask.getDone()).isEqualTo(false);
+        String markedDoneTaskJSON = taskEndpoint.markTaskDone(createdTask.getId(), "gosiaTest");
+        TaskModel markedDoneTask = mapper.readValue(markedDoneTaskJSON, TaskModel.class);
+        assertThat(markedDoneTask.getDone()).isEqualTo(true);
+        assertThat(repository.findById(markedDoneTask.getId()).getDone()).isEqualTo(true);
+
+
     }
 }
