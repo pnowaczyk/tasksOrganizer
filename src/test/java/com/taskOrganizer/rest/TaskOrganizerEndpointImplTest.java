@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.io.Files;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
 import com.taskOrganizer.conf.MongoTestConfig;
 import com.taskOrganizer.model.TaskModel;
 import com.taskOrganizer.model.TaskPostJSONModel;
@@ -14,7 +17,9 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Requests;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.node.Node;
+
 import java.time.Instant;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -44,6 +49,8 @@ public class TaskOrganizerEndpointImplTest {
     private TaskOrganizerEndpointImpl taskEndpoint;
     private ObjectMapper mapper;
     private TaskPostJSONModel taskInputData;
+    private Connection messagingConnection;
+    private Channel messagingChannel;
     @Autowired
     private TaskRepository repository;
     private String[] taskNames = {"ATech Leaders meeting", "BGoing shopping", "CJOGA class"};
@@ -69,14 +76,20 @@ public class TaskOrganizerEndpointImplTest {
         // documents for tests
         elasticClient.admin().indices().create(Requests.createIndexRequest("tasksorganizer")).actionGet();
         elasticClient.admin().indices().refresh(new RefreshRequest()).actionGet();
-        taskEndpoint = new TaskOrganizerEndpointImpl(mapper, repository, elasticClient);
+        String EXCHANGE_NAME = "taskorganizer_logs";
+        ConnectionFactory factory = new ConnectionFactory();
+        factory.setHost("localhost");
+        messagingConnection = factory.newConnection();
+        messagingChannel = messagingConnection.createChannel();
+        messagingChannel.exchangeDeclare(EXCHANGE_NAME, "fanout");
+        taskEndpoint = new TaskOrganizerEndpointImpl(mapper, repository, elasticClient, messagingChannel);
         taskInputData = new TaskPostJSONModel();
         repository.deleteAll();
         intialTaskList = new ArrayList<>();
         for (int i = 0; i < taskNames.length; i++) {
             taskInputData.name = taskNames[i];
             taskInputData.description = taskDescriptions[i];
-            taskInputData.dueDate = Instant.now().plusMillis(1000*60*60*24);
+            taskInputData.dueDate = Instant.now().plusMillis(1000 * 60 * 60 * 24);
             taskInputData.userName = "janTest";
             String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
             TaskModel createdTask = mapper.readValue(createdTaskJSON, TaskModel.class);
@@ -87,7 +100,7 @@ public class TaskOrganizerEndpointImplTest {
     }
 
     @After
-    public void tearDown() {
+    public void tearDown() throws Exception{
 
         elasticClient.admin()
                 .indices()
@@ -96,13 +109,15 @@ public class TaskOrganizerEndpointImplTest {
                 .actionGet();
         node.close();
         tmpDir.delete();
+        messagingChannel.close();
+        messagingConnection.close();
     }
 
     @Test
     public void createNewTask() throws Exception {
         taskInputData.name = "New task";
         taskInputData.description = "Brand new test task";
-        taskInputData.dueDate = Instant.now().plusMillis(1000*60*60*24);
+        taskInputData.dueDate = Instant.now().plusMillis(1000 * 60 * 60 * 24);
         taskInputData.userName = "gosiaTest";
         String createdTaskJSON = taskEndpoint.createTask(mapper.writeValueAsString(taskInputData));
         assertThat(repository.findAll().size()).isEqualTo(4);

@@ -17,7 +17,7 @@ import java.net.UnknownHostException;
 @Configuration
 public class ElasticConf {
 
-@Bean
+    @Bean(destroyMethod = "close")
     public Client getElasticClient() throws UnknownHostException {
         Settings settings = Settings.settingsBuilder()
                 .put("cluster.name", "elasticsearch").build();

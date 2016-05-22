@@ -4,6 +4,7 @@ package com.taskOrganizer.rest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.rabbitmq.client.Channel;
 import com.taskOrganizer.model.TaskModel;
 import com.taskOrganizer.model.TaskPostJSONModel;
 import com.taskOrganizer.model.TaskRepository;
@@ -38,25 +39,34 @@ public class TaskOrganizerEndpointImpl implements TaskOrganizerEndpoint {
     private ObjectMapper mapper;
     private TaskRepository repository;
     private Client elasticClient;
+    private Channel messagingChannel;
+    private String EXCHANGE_NAME = "taskorganizer_logs";
     final static Logger logger = LoggerFactory.getLogger(TaskOrganizerEndpointImpl.class);
 
+
+
     @Autowired
-    public TaskOrganizerEndpointImpl(ObjectMapper mapper, TaskRepository repository, Client elasticClient) {
+    public TaskOrganizerEndpointImpl(ObjectMapper mapper, TaskRepository repository, Client elasticClient, Channel messagingChannel) {
 
         this.mapper = mapper;
         mapper.registerModule(new JavaTimeModule());
         mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, true);
         this.repository = repository;
         this.elasticClient = elasticClient;
+        this.messagingChannel = messagingChannel;
     }
 
     public String createTask(String inputData) throws Exception {
         logger.info("Creating task");
+
         TaskPostJSONModel inputDataObj = mapper.readValue(inputData, TaskPostJSONModel.class);
         TaskModel task = new TaskModel(inputDataObj.name, inputDataObj.description, UUID.randomUUID().toString(), inputDataObj.dueDate, inputDataObj.userName);
         repository.save(task);
         IndexResponse response = elasticClient.prepareIndex("tasksorganizer", "task", task.getId())
                 .setSource(mapper.writeValueAsBytes(task)).get();
+        String message = "task created " + task.getId();
+        logger.info("messagingChannel '" + messagingChannel + " " + messagingChannel.toString() + "'");
+        messagingChannel.basicPublish(EXCHANGE_NAME, "", null, mapper.writeValueAsString(task).getBytes("UTF-8"));
         return mapper.writeValueAsString(task);
     }
 
