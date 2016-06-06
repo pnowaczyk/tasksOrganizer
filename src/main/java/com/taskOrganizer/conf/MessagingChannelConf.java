@@ -14,23 +14,10 @@ import org.springframework.context.annotation.Configuration;
 public class MessagingChannelConf {
 
     private static final String EXCHANGE_NAME = "logs";
-    private Connection messagingConnection;
 
     @Autowired
-    private MessagingChannelConf(Connection messagingConnection){
-    this.messagingConnection = messagingConnection;
-    }
-
-    public Connection getMessagingConnection() {
-        return messagingConnection;
-    }
-
-    public void setMessagingConnection(Connection messagingConnection) {
-        this.messagingConnection = messagingConnection;
-    }
-
     @Bean(destroyMethod = "close")
-    public Channel getMessagingChannel() throws Exception {
+    public Channel getMessagingChannel(Connection messagingConnection) throws Exception {
         Channel channel = messagingConnection.createChannel();
 
         channel.exchangeDeclare(EXCHANGE_NAME, "fanout");
